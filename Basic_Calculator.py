@@ -1,211 +1,263 @@
 """
-This is utility program to perform Basic Calculation.
+A desktop basic calculator implemented with Python and Tkinter.
 
-Date of Initial code :  written on 7-Nov-2020
-Author               : Parashar Bhatt
-
-
-
+Original author: Parashar Bhatt
 """
+
 import os
-from tkinter import *
-
-impath = os.path.join(os.getcwd(),'HandDrawCalculator.ico')
-print(impath)
-
-
-root = Tk()  # main window
-root.title("Basic Calculator")
-
-#root.iconbitmap("HandDrawCalculator.ico")
-
-#root.iconbitmap(impath)
-
-"""
-
-if "nt" == os.name:
-    root.wm_iconbitmap(bitmap = "HandDrawCalculator.ico")
-else:
-    root.wm_iconbitmap(bitmap = "HandDrawCalculator.xbm" )
-    
-"""
+import math
+import tkinter as tk
+from tkinter import ttk
 
 
+class Calculator(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Basic Calculator")
+        self.resizable(False, False)
+        self.configure(padx=18, pady=18)
 
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HandDrawCalculator.ico")
+        if os.name == "nt" and os.path.exists(icon_path):
+            self.iconbitmap(icon_path)
 
-global opcode
-e = Entry(root, width=35, borderwidth=5)
+        self.current_value = "0"
+        self.pending_value = None
+        self.pending_operator = None
+        self.waiting_for_operand = False
+        self.last_operator = None
+        self.last_operand = None
 
-e.grid(row=0, column=0, columnspan=3, padx=10, pady=10)
+        self._create_style()
+        self._create_widgets()
+        self._bind_keys()
 
-def button_click(number):
-    current=e.get()
-    current= str(current)+str(number)
-    e.delete(0, END)
-    e.insert(0, current)
+    def _create_style(self):
+        style = ttk.Style(self)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
 
-def button_dot():
-    val= e.get()
-    val = str(val)+"."
-    e.delete(0, END)
-    e.insert(0,val)
+        style.configure("Calculator.TFrame", background="#eef2f6")
+        style.configure("Display.TEntry",
+                        fieldbackground="#ffffff",
+                        foreground="#20242a",
+                        padding=(14, 12),
+                        borderwidth=0)
+        style.configure("Number.TButton", font=("Segoe UI", 12), padding=(10, 12))
+        style.configure("Operator.TButton", font=("Segoe UI", 12, "bold"),
+                        foreground="#1167b1", padding=(10, 12))
+        style.configure("Action.TButton", font=("Segoe UI", 12),
+                        foreground="#b42318", padding=(10, 12))
 
+        self.configure(background="#eef2f6")
 
-def button_square():
-    global opcode
-    opcode = "square"
-    first_number= e.get()
-    global f_num
-    f_num = float(first_number)
-    global s_num
-    s_num=2
-    global result
-    result=calculate()
-    e.delete(0,END)
-    e.insert(0,result)
+    def _create_widgets(self):
+        frame = ttk.Frame(self, style="Calculator.TFrame")
+        frame.grid(row=0, column=0)
 
-    
+        self.display_variable = tk.StringVar(value="0")
+        self.display = ttk.Entry(
+            frame,
+            textvariable=self.display_variable,
+            justify="right",
+            width=18,
+            font=("Segoe UI", 22),
+            style="Display.TEntry",
+        )
+        self.display.grid(row=0, column=0, columnspan=4, sticky="ew", pady=(0, 12), ipady=10)
 
-def button_power():
-    global opcode
-    opcode="power"
-    first_number= e.get()
-    global f_num
-    f_num = float(first_number)
-    e.delete(0, END)
+        buttons = (
+            ("C", "Action.TButton", self.clear, 1, 0),
+            ("Back", "Action.TButton", self.backspace, 1, 1),
+            ("%", "Operator.TButton", self.percent, 1, 2),
+            ("/", "Operator.TButton", lambda: self.choose_operator("/"), 1, 3),
+            ("7", "Number.TButton", lambda: self.input_digit("7"), 2, 0),
+            ("8", "Number.TButton", lambda: self.input_digit("8"), 2, 1),
+            ("9", "Number.TButton", lambda: self.input_digit("9"), 2, 2),
+            ("*", "Operator.TButton", lambda: self.choose_operator("*"), 2, 3),
+            ("4", "Number.TButton", lambda: self.input_digit("4"), 3, 0),
+            ("5", "Number.TButton", lambda: self.input_digit("5"), 3, 1),
+            ("6", "Number.TButton", lambda: self.input_digit("6"), 3, 2),
+            ("-", "Operator.TButton", lambda: self.choose_operator("-"), 3, 3),
+            ("1", "Number.TButton", lambda: self.input_digit("1"), 4, 0),
+            ("2", "Number.TButton", lambda: self.input_digit("2"), 4, 1),
+            ("3", "Number.TButton", lambda: self.input_digit("3"), 4, 2),
+            ("+", "Operator.TButton", lambda: self.choose_operator("+"), 4, 3),
+            ("+/-", "Number.TButton", self.toggle_sign, 5, 0),
+            ("0", "Number.TButton", lambda: self.input_digit("0"), 5, 1),
+            (".", "Number.TButton", self.input_decimal, 5, 2),
+            ("=", "Operator.TButton", self.calculate, 5, 3),
+            ("x^2", "Operator.TButton", self.square, 6, 0),
+            ("x^y", "Operator.TButton", lambda: self.choose_operator("^"), 6, 1),
+        )
 
-def button_add():
-    global opcode
-    opcode="+"
-    first_number= e.get()
-    global f_num
-    f_num = float(first_number)
-    e.delete(0, END)
+        for text, style_name, command, row, column in buttons:
+            button = ttk.Button(frame, text=text, style=style_name, command=command)
+            button.grid(row=row, column=column, sticky="nsew", padx=3, pady=3)
 
-def button_subtract():
-    global opcode
-    opcode="-"
-    first_number= e.get()
-    global f_num
-    f_num = float(first_number)
-    e.delete(0, END)
+        for column in range(4):
+            frame.columnconfigure(column, weight=1, uniform="column")
+        for row in range(1, 7):
+            frame.rowconfigure(row, weight=1)
 
-def button_multiply():
-    global opcode
-    opcode="*"
-    first_number= e.get()
-    global f_num
-    f_num = float(first_number)
-    e.delete(0, END)
+    def _bind_keys(self):
+        for number in "0123456789":
+            self.bind(number, lambda event, digit=number: self.input_digit(digit))
+        for operator in "+-*/":
+            self.bind(operator, lambda event, op=operator: self.choose_operator(op))
+        self.bind("^", lambda event: self.choose_operator("^"))
+        self.bind(".", self.input_decimal)
+        self.bind("<Return>", lambda event: self.calculate())
+        self.bind("<KP_Enter>", lambda event: self.calculate())
+        self.bind("<BackSpace>", lambda event: self.backspace())
+        self.bind("<Escape>", lambda event: self.clear())
+        self.bind("<Delete>", lambda event: self.clear())
 
-def button_divide():
-    global opcode
-    opcode="/"
-    first_number= e.get()
-    global f_num
-    f_num = float(first_number)
-    e.delete(0, END)
+    def _set_display(self, value):
+        self.current_value = value
+        self.display_variable.set(value)
 
-def button_equal():
-    global opcode
-    if opcode !="square":
-        second_number= e.get()
-    elif opcode == "square":
-        second_number=2
+    @staticmethod
+    def _format_number(value):
+        if not isinstance(value, (int, float)) or not math.isfinite(value):
+            return "Error"
+        if abs(value) < 1e-12:
+            value = 0.0
+        text = format(value, ".12g")
+        return text
 
-    global s_num
-    s_num = float(second_number)
-    e.delete(0, END)
-    global result
-    result=calculate()
-    e.insert(0, result)
-
-    
-
-
-
-def button_clear():
-    e.delete(0, END)
-
-def calculate():
-    global opcode
-    global f_num
-    global s_num
-    global result
-    if opcode == "+":
-        result = f_num + s_num
-    elif opcode =="-":
-        result = f_num - s_num
-    elif opcode =="*":
-        result = f_num * s_num
-    elif opcode =="/":
-        if s_num != 0:
-            result = f_num / s_num
+    def input_digit(self, digit):
+        if self.current_value == "Error" or self.waiting_for_operand:
+            self._set_display(digit)
+            self.waiting_for_operand = False
+        elif self.current_value == "0":
+            self._set_display(digit)
         else:
-            result = "ERR!!"
-    elif opcode == "square":
-        result = pow(f_num,s_num)
-    elif opcode == "power":
-        result = pow(f_num,s_num)
-    
-    if( result - int(result)) == 0:
-        result=int(result)
-    return result
+            if len(self.current_value.replace("-", "").replace(".", "")) >= 16:
+                return
+            self._set_display(self.current_value + digit)
+
+    def input_decimal(self, event=None):
+        if self.current_value == "Error" or self.waiting_for_operand:
+            self._set_display("0.")
+            self.waiting_for_operand = False
+        elif "." not in self.current_value:
+            self._set_display(self.current_value + ".")
+
+    def toggle_sign(self):
+        if self.current_value == "0" or self.current_value == "Error":
+            return
+        if self.current_value.startswith("-"):
+            self._set_display(self.current_value[1:])
+        else:
+            self._set_display("-" + self.current_value)
+
+    def backspace(self):
+        if self.current_value == "Error" or self.waiting_for_operand:
+            self._set_display("0")
+            return
+        updated = self.current_value[:-1]
+        self._set_display(updated if updated not in ("", "-", "-0") else "0")
+
+    def clear(self):
+        self._set_display("0")
+        self.pending_value = None
+        self.pending_operator = None
+        self.waiting_for_operand = False
+        self.last_operator = None
+        self.last_operand = None
+
+    def percent(self):
+        if self.current_value == "Error":
+            return
+        value = float(self.current_value) / 100
+        self._set_display(self._format_number(value))
+
+    def choose_operator(self, operator):
+        if self.current_value == "Error":
+            return
+
+        value = float(self.current_value)
+        if self.pending_operator and not self.waiting_for_operand:
+            value = self._perform_operation(self.pending_value, value, self.pending_operator)
+            if value == "Error":
+                self._set_display("Error")
+                self.pending_value = None
+                self.pending_operator = None
+                return
+            self._set_display(value)
+
+        self.pending_value = float(self.current_value)
+        self.pending_operator = operator
+        self.waiting_for_operand = True
+
+    def calculate(self):
+        if self.pending_operator is not None:
+            if self.current_value == "Error":
+                return
+            if self.waiting_for_operand:
+                second_value = self.pending_value
+            else:
+                second_value = float(self.current_value)
+            first_value = self.pending_value
+            operator = self.pending_operator
+        elif self.last_operator is not None and self.last_operand is not None:
+            first_value = float(self.current_value)
+            second_value = self.last_operand
+            operator = self.last_operator
+        else:
+            return
+
+        result = self._perform_operation(
+            first_value,
+            second_value,
+            operator,
+        )
+        if result == "Error":
+            self._set_display("Error")
+        else:
+            self._set_display(result)
+
+        self.last_operator = operator
+        self.last_operand = second_value
+        self.pending_value = None
+        self.pending_operator = None
+        self.waiting_for_operand = True
+
+    def square(self):
+        if self.current_value == "Error":
+            return
+        value = float(self.current_value)
+        try:
+            result = value ** 2
+            self._set_display(self._format_number(result))
+        except OverflowError:
+            self._set_display("Error")
+        self.waiting_for_operand = True
+
+    def _perform_operation(self, first, second, operator):
+        try:
+            if operator == "+":
+                result = first + second
+            elif operator == "-":
+                result = first - second
+            elif operator == "*":
+                result = first * second
+            elif operator == "/":
+                if second == 0:
+                    return "Error"
+                result = first / second
+            elif operator == "^":
+                result = first ** second
+            else:
+                return "Error"
+            return self._format_number(result)
+        except (OverflowError, ZeroDivisionError, TypeError, ValueError):
+            return "Error"
 
 
-# define button
-
-button_1 = Button(root, text="1", padx=40, pady=10 , command=lambda: button_click(1))
-button_2 = Button(root, text="2", padx=40, pady=10 , command=lambda: button_click(2))
-button_3 = Button(root, text="3", padx=40, pady=10 , command=lambda: button_click(3))
-button_4 = Button(root, text="4", padx=40, pady=10 , command=lambda: button_click(4))
-button_5 = Button(root, text="5", padx=40, pady=10 , command=lambda: button_click(5))
-button_6 = Button(root, text="6", padx=40, pady=10 , command=lambda: button_click(6))
-button_7 = Button(root, text="7", padx=40, pady=10 , command=lambda: button_click(7))
-button_8 = Button(root, text="8", padx=40, pady=10 , command=lambda: button_click(8))
-button_9 = Button(root, text="9", padx=40, pady=10 , command=lambda: button_click(9))
-button_10 = Button(root, text="0", padx=40, pady=10 , command=lambda: button_click(0))
-button_clear = Button(root, text="Clear", padx=81, pady=10 , command=button_clear)
-
-button_add = Button(root, text="+", padx=39, pady=10 , command=button_add)
-button_multiply = Button(root, text="*", padx=41, pady=10 , command=button_multiply)
-button_subtract = Button(root, text="-", padx=39, pady=10 , command=button_subtract)
-button_divide = Button(root, text="/", padx=41, pady=10 , command=button_divide)
-
-button_equal = Button(root, text="=", padx=91, pady=10 , command=button_equal)
-
-
-button_11 = Button(root, text=".", padx=40, pady=10 , command=button_dot)
-button_12 = Button(root, text="x^2", padx=35, pady=10 , command=button_square)
-button_13 = Button(root, text="x^y", padx=35, pady=10 , command=button_power)
-
-
-# put button on screen
-
-button_1.grid(row=3,column=0)
-button_2.grid(row=3,column=1)
-button_3.grid(row=3,column=2)
-button_4.grid(row=2,column=0)
-button_5.grid(row=2,column=1)
-button_6.grid(row=2,column=2)
-button_7.grid(row=1,column=0)
-button_8.grid(row=1,column=1)
-button_9.grid(row=1,column=2)
-button_10.grid(row=4,column=0)
-button_clear.grid(row=4,column=1, columnspan=2)
-button_add.grid(row=5,column=0)
-button_equal.grid(row=5,column=1,columnspan=2)
-button_subtract.grid(row=6,column=0)
-button_multiply.grid(row=6,column=1)
-button_divide.grid(row=6,column=2)
-button_11.grid(row=7,column=0)
-button_12.grid(row=7,column=1)
-button_13.grid(row=7,column=2)
-#button_.grid(row=1,column=0)
-
-
-
-# event looping
-
-root.mainloop()
-
+if __name__ == "__main__":
+    app = Calculator()
+    app.mainloop()
