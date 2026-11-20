@@ -3,6 +3,14 @@
 
 A desktop calculator built with Python and the Tkinter standard library.
 
+## Project Category
+
+`Desktop Application` `Utility` `Calculator`
+
+## Tools & Technologies
+
+`Python` `Tkinter` `Python Standard Library`
+
 ## Features
 
 - Addition, subtraction, multiplication, and division
